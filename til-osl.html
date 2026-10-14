@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Til OSL">
+<meta name="theme-color" content="#0f6e6a">
+<title>Til OSL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one narrow column — time controls, route filter, then one card per complete home→OSL chain. */
+:root{
+  --bg:#eaeef2; --surface:#ffffff; --ink:#111821; --muted:#5a6573; --line:#d3dae2; --soft:#f3f6f9;
+  --accent:#0f6e6a; --accent-ink:#ffffff; --warn:#a15c00; --ok:#2c7a3c; --note:#6b3fd1;
+  --m-bus:#c8322b; --m-metro:#e06b00; --m-fly:#7a2a8f; --m-rail:#2c8a3c; --m-walk:#5a6573;
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0d1217; --surface:#151c23; --ink:#e6ebf0; --muted:#8e9aa7; --line:#27313b; --soft:#1b232b;
+  --accent:#3fb3a9; --accent-ink:#06201e; --warn:#e3a54a; --ok:#6fcf86; --note:#b39cff; --m-fly:#9b4db3; --m-walk:#6c7885; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0d1217; --surface:#151c23; --ink:#e6ebf0; --muted:#8e9aa7; --line:#27313b; --soft:#1b232b;
+  --accent:#3fb3a9; --accent-ink:#06201e; --warn:#e3a54a; --ok:#6fcf86; --note:#b39cff; --m-fly:#9b4db3; --m-walk:#6c7885; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--f-body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px 40px}
+.wrap{max-width:620px;margin:0 auto;display:grid;gap:14px}
+header{display:grid;gap:2px}
+h1{font:700 32px/1 var(--f-display);letter-spacing:.01em;margin:0;text-transform:uppercase}
+h1 span{color:var(--accent)}
+.sub{color:var(--muted);font-size:13px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:12px}
+.field{display:grid;gap:4px;min-width:0}
+.field label,.lbl{font:600 11px/1 var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+input,select,button{font:inherit;color:inherit}
+input[type=text],input[type=datetime-local],input[type=number]{width:100%;min-width:0;background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:10px 11px;font-size:16px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{flex:1;border:0;background:var(--soft);padding:9px 6px;cursor:pointer;font-size:14px;white-space:nowrap}
+.seg button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink);font-weight:600}
+.btns{display:grid;grid-template-columns:auto 1fr;gap:8px}
+.now{border:1px solid var(--line);background:var(--soft);border-radius:10px;padding:0 16px;cursor:pointer;font-weight:600}
+.go{border:0;border-radius:10px;background:var(--accent);color:var(--accent-ink);padding:13px;font:700 19px/1 var(--f-display);letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
+.go:disabled{opacity:.6;cursor:progress}
+details.opts summary{cursor:pointer;color:var(--muted);font-size:13px}
+.opt-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:10px}
+.check{display:flex;gap:8px;align-items:center;font-size:14px}
+.resolved{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.6}
+.status{font-size:13px;color:var(--muted)}
+.err{color:var(--warn);font-size:13px}
+.filter{overflow-x:auto}
+.filter .seg button{font-size:13px;padding:8px 10px}
+.list{display:grid;gap:8px}
+.trip{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;gap:8px}
+.trip.best{border-color:var(--accent)}
+.top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.leave{display:grid;gap:2px}
+.leave small{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.times{font:600 24px/1 var(--f-mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.times .arrow{color:var(--muted);font-weight:500;margin:0 4px;font-size:18px}
+.dur{font:600 15px/1 var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right}
+.dur small{display:block;font:500 12px/1.4 var(--f-body);color:var(--muted)}
+.route{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:4px;border-radius:5px;padding:3px 7px;font:600 13px/1.1 var(--f-mono);color:#fff;white-space:nowrap}
+.chip.walk{background:transparent;color:var(--muted);border:1px dashed var(--line);font-weight:500}
+.sep{color:var(--muted);font-size:12px}
+.via{font:700 13px/1 var(--f-display);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:14px;border-top:1px solid var(--line);padding-top:8px}
+.steps li{display:grid;grid-template-columns:46px 1fr;gap:8px}
+.steps .t{font:600 13px/1.45 var(--f-mono);font-variant-numeric:tabular-nums}
+.steps .d{min-width:0}
+.steps .x{color:var(--muted);font-size:12px}
+.late{color:var(--warn);font-size:12px;font-weight:600}
+.note{border-radius:8px;background:var(--soft);padding:8px 10px;font-size:13px;border-left:3px solid var(--note)}
+.note b{color:var(--note)}
+.note.no{border-left-color:var(--muted)}
+.tight{color:var(--warn)}
+.okm{color:var(--ok)}
+.sit{color:var(--warn);font-size:12px}
+.empty{color:var(--muted);text-align:center;padding:24px 8px;font-size:14px}
+.cmp h2{font:700 18px/1 var(--f-display);letter-spacing:.05em;text-transform:uppercase;margin:0}
+.cmp .verdict{font-size:14px}
+.cmp .row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:8px}
+.cmp .row .times{font-size:17px}
+.flag{font-size:12px;color:var(--warn);font-weight:600}
+footer{color:var(--muted);font-size:12px;text-align:center}
+@media (max-width:420px){.two{grid-template-columns:1fr}.times{font-size:21px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Til <span>OSL</span></h1>
+    <div class="sub" id="homeLabel">Kalderaveien 8C → Oslo lufthavn · bytte på Eiksmarka</div>
+  </header>
+
+  <form class="card" id="form">
+    <div class="two">
+      <div class="field">
+        <label for="when">Tid</label>
+        <input type="datetime-local" id="when">
+      </div>
+      <div class="field">
+        <span class="lbl">Tiden gjelder</span>
+        <div class="seg" id="modeSeg">
+          <button type="button" data-v="dep" aria-pressed="true">Avreise</button>
+          <button type="button" data-v="arr" aria-pressed="false">Fremme senest</button>
+        </div>
+      </div>
+    </div>
+    <div class="btns">
+      <button type="button" class="now" id="nowBtn">Nå</button>
+      <button class="go" id="go" type="submit">Finn reiser</button>
+    </div>
+    <details class="opts">
+      <summary>Oppsett og byttetider</summary>
+      <div class="opt-grid">
+        <div class="field"><label for="home">Hjemme</label><input type="text" id="home" value="Kalderaveien 8C"></div>
+        <div class="field"><label for="s-eiks">Bytte buss → T-bane, Eiksmarka (min)</label><input type="number" id="s-eiks" min="0" max="15" value="2"></div>
+        <div class="field"><label for="s-nt">T-bane → Flytoget, Nationaltheatret (min)</label><input type="number" id="s-nt" min="0" max="20" value="5"></div>
+        <div class="field"><label for="s-os">T-bane Jernbanetorget → Flytoget, Oslo S (min)</label><input type="number" id="s-os" min="0" max="20" value="6"></div>
+        <div class="field"><label for="s-lys">Buss → Flytoget, Lysaker (min)</label><input type="number" id="s-lys" min="0" max="20" value="5"></div>
+        <label class="check"><input type="checkbox" id="vy"> Ta med Vy-tog til Gardermoen</label>
+      </div>
+      <div class="resolved" id="resolved"></div>
+    </details>
+    <div class="status" id="status" hidden></div>
+  </form>
+
+  <div class="filter" id="filterWrap" hidden>
+    <div class="seg" id="filterSeg">
+      <button type="button" data-v="all" aria-pressed="true">Alle</button>
+      <button type="button" data-v="NT" aria-pressed="false">Nationaltheatret</button>
+      <button type="button" data-v="OS" aria-pressed="false">Oslo S</button>
+      <button type="button" data-v="LYS" aria-pressed="false">Lysaker</button>
+    </div>
+  </div>
+  <section class="card cmp" id="compare" hidden></section>
+  <div class="list" id="list"><div class="empty">Trykk «Finn reiser». Siden setter sammen buss eller gange til Eiksmarka, T-banen inn til byen og Flytoget, pluss bussen via Lysaker, og viser hele reiser fra døren.</div></div>
+  <footer>Rutedata og sanntid fra Entur. Byttene er alltid Eiksmarka, Nationaltheatret, Oslo S eller Lysaker.</footer>
+</div>
+
+<script>
+const H = { 'ET-Client-Name': 'jonas-tilosl' };
+const JP = 'https://api.entur.io/journey-planner/v3/graphql';
+const GEO = 'https://api.entur.io/geocoder/v1';
+const $ = id => document.getElementById(id);
+const MIN = 60000;
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const hm = d => new Date(d).toLocaleTimeString('no-NO', { hour:'2-digit', minute:'2-digit', timeZone:'Europe/Oslo' });
+const dmin = ms => Math.round(ms / MIN);
+const fmtDur = ms => { const m = dmin(ms); return m < 60 ? `${m} min` : `${Math.floor(m/60)} t ${String(m%60).padStart(2,'0')}`; };
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch{ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} }
+};
+
+/* ---------- settings ---------- */
+const SETTINGS = ['home','s-eiks','s-nt','s-os','s-lys','vy'];
+function loadSettings(){
+  const s = store.get('tilosl.settings', {});
+  for (const k of SETTINGS) if (k in s){ const el = $(k); el.type === 'checkbox' ? el.checked = s[k] : el.value = s[k]; }
+}
+function saveSettings(){
+  const s = {}; for (const k of SETTINGS){ const el = $(k); s[k] = el.type === 'checkbox' ? el.checked : el.value; }
+  store.set('tilosl.settings', s);
+}
+const slack = id => Math.max(0, +$(id).value || 0) * MIN;
+
+/* ---------- stop lookup ---------- */
+const STOPS = {
+  eiks:  { q:'Eiksmarka',        cats:['metroStation'], label:'Eiksmarka T' },
+  ntM:   { q:'Nationaltheatret', cats:['metroStation'], label:'Nationaltheatret T' },
+  ntR:   { q:'Nationaltheatret', cats:['railStation'],  label:'Nationaltheatret stasjon' },
+  jbt:   { q:'Jernbanetorget',   cats:['metroStation'], label:'Jernbanetorget T' },
+  os:    { q:'Oslo S',           cats:['railStation'],  label:'Oslo S' },
+  lys:   { q:'Lysaker',          cats:['railStation'],  label:'Lysaker stasjon' },
+  osl:   { q:'Oslo lufthavn',    cats:['railStation'],  label:'Oslo lufthavn stasjon' }
+};
+async function geo(text, layers, lat = 59.93, lon = 10.68){
+  const u = `${GEO}/autocomplete?text=${encodeURIComponent(text)}&size=10&lang=no&layers=${layers}&focus.point.lat=${lat}&focus.point.lon=${lon}`;
+  const j = await (await fetch(u, { headers:H })).json();
+  return j.features || [];
+}
+const toPlace = f => ({ id:f.properties.id, name:f.properties.name, label:f.properties.label, lat:f.geometry.coordinates[1], lon:f.geometry.coordinates[0] });
+async function resolveStops(){
+  const cached = store.get('tilosl.stops', null);
+  if (cached && Date.now() - cached.t < 30*864e5) return cached.s;
+  const s = {};
+  await Promise.all(Object.entries(STOPS).map(async ([k, def]) => {
+    const feats = (await geo(def.q, 'venue')).filter(f => /^NSR:StopPlace:/.test(f.properties.id));
+    const f = feats.find(f => (f.properties.category || []).some(c => def.cats.includes(c))) || feats[0];
+    if (!f) throw new Error(`Fant ikke holdeplassen ${def.label}.`);
+    s[k] = toPlace(f);
+  }));
+  store.set('tilosl.stops', { t:Date.now(), s });
+  return s;
+}
+async function resolveHome(){
+  const text = $('home').value.trim();
+  const cached = store.get('tilosl.home', null);
+  if (cached && cached.text === text) return cached.p;
+  const feats = await geo(text, 'address', 59.947, 10.62);
+  if (!feats.length) throw new Error(`Fant ikke adressen «${text}». Rett den under Oppsett.`);
+  const p = toPlace(feats[0]);
+  store.set('tilosl.home', { text, p });
+  return p;
+}
+
+/* ---------- journey planner ---------- */
+const FIELDS = `tripPatterns{ expectedStartTime expectedEndTime duration walkDistance
+  legs{ mode distance duration expectedStartTime expectedEndTime aimedStartTime realtime
+    line{ id publicCode name transportMode authority{ name } }
+    serviceJourney{ id }
+    fromPlace{ name quay{ publicCode stopPlace{ id name } } }
+    toPlace{ name quay{ publicCode stopPlace{ id name } } }
+    fromEstimatedCall{ destinationDisplay{ frontText } }
+    intermediateEstimatedCalls{ quay{ stopPlace{ id name } } expectedArrivalTime }
+    situations{ summary{ value } } } }`;
+const TYPES = { from:'Location!', to:'Location!', dateTime:'DateTime', arriveBy:'Boolean', numTripPatterns:'Int', modes:'Modes', searchWindow:'Int', walkSpeed:'Float' };
+const loc = p => p.id && /^NSR:StopPlace:/.test(p.id) ? { place:p.id, name:p.name } : { coordinates:{ latitude:p.lat, longitude:p.lon }, name:p.name };
+const modes = list => ({ accessMode:'foot', egressMode:'foot', transportModes:list });
+
+async function trip(vars){
+  const decl = Object.keys(vars).map(k => `$${k}:${TYPES[k]}`).join(',');
+  const args = Object.keys(vars).map(k => `${k}:$${k}`).join(',');
+  const r = await fetch(JP, { method:'POST', headers:{ ...H, 'Content-Type':'application/json' },
+    body: JSON.stringify({ query:`query(${decl}){ trip(${args}){ ${FIELDS} } }`, variables:vars }) });
+  const j = await r.json();
+  if (!j.data?.trip) throw new Error(j.errors?.[0]?.message || `HTTP ${r.status}`);
+  return j.data.trip.tripPatterns;
+}
+const transitLegs = p => p.legs.filter(l => l.mode !== 'foot');
+const isFly = l => /^FLT:/.test(l.line?.id || '') || /flytoget/i.test(l.line?.authority?.name || '');
+
+/* A "ride" is one direct vehicle between two of our stops, with real times. */
+function rides(pats, accept){
+  const out = [];
+  for (const p of pats){
+    const t = transitLegs(p);
+    if (t.length !== 1 || !accept(t[0])) continue;
+    const l = t[0];
+    out.push({ dep:+new Date(l.expectedStartTime), arr:+new Date(l.expectedEndTime), leg:l, sj:l.serviceJourney?.id,
+      walkBefore:+new Date(l.expectedStartTime) - +new Date(p.expectedStartTime), walkAfter:+new Date(p.expectedEndTime) - +new Date(l.expectedEndTime) });
+  }
+  const seen = new Set();
+  return out.filter(r => { const k = r.sj + r.dep; return !seen.has(k) && seen.add(k); }).sort((a,b) => a.dep - b.dep);
+}
+/* Bus trips from home: keep patterns that use bus only, record when to leave the door and when you're at the target stop. */
+function busTrips(pats){
+  const seen = new Set();
+  return pats.filter(p => { const t = transitLegs(p); return t.length && t.every(l => l.mode === 'bus' || l.mode === 'coach'); })
+    .map(p => ({ leave:+new Date(p.expectedStartTime), arrive:+new Date(p.expectedEndTime), p }))
+    .filter(b => { const k = b.leave + '|' + b.arrive; return !seen.has(k) && seen.add(k); })
+    .sort((a,b) => a.leave - b.leave);
+}
+const nextAfter = (list, t) => list.find(r => r.dep >= t);
+
+/* ---------- search ---------- */
+let chains = [], filter = 'all', ctx = null;
+
+async function search(){
+  const st = $('status'), go = $('go');
+  go.disabled = true; st.hidden = false; st.textContent = 'Henter holdeplasser…';
+  saveSettings();
+  try {
+    const [S, home] = await Promise.all([resolveStops(), resolveHome()]);
+    $('homeLabel').textContent = `${home.label} → Oslo lufthavn · bytte på Eiksmarka`;
+    $('resolved').innerHTML = `Hjemme: ${esc(home.label)}<br>` + Object.entries(STOPS).map(([k,d]) => `${esc(d.label)}: ${esc(S[k].label)} <span style="opacity:.6">(${esc(S[k].id)})</span>`).join('<br>');
+
+    const T = $('when').value ? +new Date($('when').value) : Date.now();
+    const arriveBy = ctx_mode === 'arr';
+    const t0 = arriveBy ? T - 150*MIN : T;
+    const iso = t => new Date(t).toISOString();
+    const flyModes = $('vy').checked ? modes([{ transportMode:'rail' }]) : modes([{ transportMode:'rail', transportSubModes:['airportLinkRail'] }]);
+    const flyAccept = l => l.mode === 'rail' && ($('vy').checked || isFly(l));
+    const metroAccept = l => l.mode === 'metro';
+
+    st.textContent = 'Henter avganger og appens forslag (9 søk)…';
+    const q = (from, to, m, start, win, n) => trip({ from:loc(from), to:loc(to), dateTime:iso(start), modes:m, numTripPatterns:n, searchWindow:win });
+    const bus = modes([{ transportMode:'bus' }, { transportMode:'coach' }]);
+    const [busEiksP, busLysP, metNtP, metOsP, flyNtP, flyOsP, flyLysP, walkP, appP] = await Promise.allSettled([
+      q(home, S.eiks, bus, t0, 120, 14),
+      q(home, S.lys, bus, t0, 120, 14),
+      q(S.eiks, S.ntM, modes([{ transportMode:'metro' }]), t0, 180, 30),
+      q(S.eiks, S.jbt, modes([{ transportMode:'metro' }]), t0, 180, 30),
+      q(S.ntR, S.osl, flyModes, t0, 210, 40),
+      q(S.os,  S.osl, flyModes, t0, 210, 40),
+      q(S.lys, S.osl, flyModes, t0, 210, 40),
+      trip({ from:loc(home), to:loc(S.eiks), dateTime:iso(t0), numTripPatterns:1, modes:{ directMode:'foot', transportModes:[] } }),
+      trip({ from:loc(home), to:loc(S.osl), dateTime:iso(T), arriveBy, numTripPatterns:4 })
+    ]);
+    const appPats = appP.status === 'fulfilled' ? appP.value.filter(p => transitLegs(p).length) : [];
+    const val = (r, name) => { if (r.status === 'fulfilled') return r.value; failures.push(`${name}: ${r.reason?.message}`); return []; };
+    const failures = [];
+    const busEiks = busTrips(val(busEiksP, 'Buss til Eiksmarka'));
+    const busLys  = busTrips(val(busLysP, 'Buss til Lysaker'));
+    const metNt = rides(val(metNtP, 'T-bane til Nationaltheatret'), metroAccept);
+    const metOs = rides(val(metOsP, 'T-bane til Jernbanetorget'), metroAccept);
+    const flyNt = rides(val(flyNtP, 'Flytoget fra Nationaltheatret'), flyAccept);
+    const flyOs = rides(val(flyOsP, 'Flytoget fra Oslo S'), flyAccept);
+    const flyLys = rides(val(flyLysP, 'Flytoget fra Lysaker'), flyAccept);
+    const walkPat = val(walkP, 'Gange').find(p => !transitLegs(p).length);
+    const walkMs = walkPat ? walkPat.duration * 1000 : Math.round(distM(home, S.eiks) * 1.3 / 1.33) * 1000;
+
+    const ntBySj = new Map(flyNt.map(r => [r.sj, r]));
+    const sE = slack('s-eiks'), sNT = slack('s-nt'), sOS = slack('s-os'), sL = slack('s-lys');
+    const out = [];
+
+    /* Access to Eiksmarka T: every bus trip, plus walking timed to each T-bane departure. */
+    const viaCity = (via, metros, flys, slackCity) => {
+      for (const b of busEiks){
+        const m = nextAfter(metros, b.arrive + sE); if (!m) continue;
+        const f = nextAfter(flys, m.arr + slackCity); if (!f) continue;
+        out.push({ via, access:'bus', leave:b.leave, arrive:f.arr + f.walkAfter, bus:b, metro:m, fly:f, waitE:m.dep - b.arrive, waitC:f.dep - m.arr });
+      }
+      for (const m of metros){
+        const leave = m.dep - walkMs - MIN;
+        const f = nextAfter(flys, m.arr + slackCity); if (!f) continue;
+        out.push({ via, access:'walk', leave, arrive:f.arr + f.walkAfter, walk:walkMs, metro:m, fly:f, waitE:MIN, waitC:f.dep - m.arr });
+      }
+    };
+    viaCity('NT', metNt, flyNt, sNT);
+    viaCity('OS', metOs, flyOs, sOS);
+    for (const b of busLys){
+      const f = nextAfter(flyLys, b.arrive + sL); if (!f) continue;
+      out.push({ via:'LYS', access:'bus', leave:b.leave, arrive:f.arr + f.walkAfter, bus:b, fly:f, waitC:f.dep - b.arrive });
+    }
+    /* For Oslo S chains: does that same train also call at Nationaltheatret, and would the T-bane get you there in time? */
+    for (const c of out) if (c.via === 'OS'){
+      const nt = ntBySj.get(c.fly.sj);
+      const ntCall = (c.metro.leg.intermediateEstimatedCalls || []).find(x => x.quay?.stopPlace?.id === S.ntM.id || /nationaltheatret/i.test(x.quay?.stopPlace?.name || ''));
+      c.ntCheck = { nt, metroAtNt: ntCall ? +new Date(ntCall.expectedArrivalTime) : null, covered: flyNt.length && c.fly.dep <= flyNt[flyNt.length-1].dep };
+    }
+
+    /* Drop chains that are worse on both ends than another chain of the same kind, then apply the time limit. */
+    const kind = c => c.via + c.access;
+    let res = out.filter(c => !out.some(o => o !== c && kind(o) === kind(c) && o.leave >= c.leave && o.arrive <= c.arrive && (o.leave > c.leave || o.arrive < c.arrive)));
+    const seen = new Set();
+    res = res.filter(c => { const k = [kind(c), c.leave, c.arrive, c.fly.sj].join('|'); return !seen.has(k) && seen.add(k); });
+    res = arriveBy ? res.filter(c => c.arrive <= T + 30000) : res.filter(c => c.leave >= T - 30000);
+    res.sort(arriveBy ? (a,b) => b.leave - a.leave || a.arrive - b.arrive : (a,b) => a.arrive - b.arrive || b.leave - a.leave);
+    chains = res; ctx = { arriveBy, T, app: appPats.map(p => ({ leave:+new Date(p.expectedStartTime), arrive:+new Date(p.expectedEndTime), p })) };
+    render();
+    st.innerHTML = `${res.length} reiser funnet · byttetid til Eiksmarka på foten: ${fmtDur(walkMs)}` + (failures.length ? `<div class="err">${failures.map(esc).join('<br>')}</div>` : '');
+  } catch (err){
+    st.innerHTML = `<span class="err">${esc(err.message)}</span>`;
+  } finally { go.disabled = false; }
+}
+function distM(a, b){
+  const R = 6371000, r = x => x*Math.PI/180, dLat = r(b.lat-a.lat), dLon = r(b.lon-a.lon);
+  return 2*R*Math.asin(Math.sqrt(Math.sin(dLat/2)**2 + Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dLon/2)**2));
+}
+
+/* ---------- render ---------- */
+const VIA = { NT:'via Nationaltheatret', OS:'via Oslo S', LYS:'via Lysaker' };
+const chip = (txt, color, cls = '') => `<span class="chip ${cls}" style="${color ? `background:var(${color})` : ''}">${esc(txt)}</span>`;
+function lineChip(l){
+  if (l.mode === 'metro') return chip(l.line?.publicCode || 'T', '--m-metro');
+  if (l.mode === 'rail') return chip(isFly(l) ? 'FLY' : (l.line?.publicCode || 'Tog'), isFly(l) ? '--m-fly' : '--m-rail');
+  return chip(l.line?.publicCode || 'Buss', '--m-bus');
+}
+function late(l){ const d = l.aimedStartTime ? dmin(new Date(l.expectedStartTime) - new Date(l.aimedStartTime)) : 0; return d > 0 ? ` <span class="late">+${d} min</span>` : ''; }
+const plat = l => l.fromPlace?.quay?.publicCode ? `, spor ${esc(l.fromPlace.quay.publicCode)}` : '';
+const wait = ms => { const m = dmin(ms); return `<span class="x ${m < 3 ? 'tight' : ''}">bytte ${m} min</span>`; };
+
+function busSteps(b){
+  return b.p.legs.map(l => l.mode === 'foot'
+    ? `<li><span class="t">${hm(l.expectedStartTime)}</span><span class="d">Gå ${fmtDur(l.duration*1000)}${l.toPlace?.name ? ' til ' + esc(l.toPlace.name) : ''}</span></li>`
+    : `<li><span class="t">${hm(l.expectedStartTime)}</span><span class="d">${lineChip(l)} mot ${esc(l.fromEstimatedCall?.destinationDisplay?.frontText || '')} fra ${esc(l.fromPlace?.name)}${late(l)}<br><span class="x">av på ${esc(l.toPlace?.name)} ${hm(l.expectedEndTime)}</span></span></li>`).join('');
+}
+function rideStep(r, toName){
+  const l = r.leg;
+  return `<li><span class="t">${hm(r.dep)}</span><span class="d">${lineChip(l)} fra ${esc(l.fromPlace?.name)}${plat(l)} mot ${esc(l.fromEstimatedCall?.destinationDisplay?.frontText || toName)}${late(l)}${l.realtime ? '' : ' <span class="x">(rutetid)</span>'}<br><span class="x">fremme ${esc(l.toPlace?.name)} ${hm(r.arr)}</span></span></li>`;
+}
+function ntNote(c){
+  const n = c.ntCheck; if (!n) return '';
+  if (!n.nt) return n.covered ? `<div class="note no">Dette flytoget starter på Oslo S og stopper ikke på Nationaltheatret. Bli sittende på T-banen til Jernbanetorget.</div>` : '';
+  const ntDep = n.nt.dep;
+  let catchTxt = '';
+  if (n.metroAtNt){
+    const margin = dmin(ntDep - n.metroAtNt);
+    catchTxt = margin >= 0
+      ? ` T-banen er på Nationaltheatret ${hm(n.metroAtNt)}, så du har <span class="${margin < 4 ? 'tight' : 'okm'}">${margin} min</span> til å bytte der.`
+      : ` T-banen er på Nationaltheatret ${hm(n.metroAtNt)}, etter at toget har gått der. Bytt på Oslo S.`;
+  }
+  return `<div class="note"><b>Samme flytog</b> går fra Nationaltheatret ${hm(ntDep)}${plat(n.nt.leg)}.${catchTxt}</div>`;
+}
+function tripHTML(c, i){
+  const parts = [];
+  if (c.access === 'walk') parts.push(chip(`🚶 ${dmin(c.walk)}`, null, 'walk'));
+  if (c.bus) transitLegs(c.bus.p).forEach(l => parts.push(lineChip(l)));
+  if (c.metro) parts.push(lineChip(c.metro.leg));
+  parts.push(lineChip(c.fly.leg));
+  const steps = [];
+  if (c.access === 'walk') steps.push(`<li><span class="t">${hm(c.leave)}</span><span class="d">Gå hjemmefra til Eiksmarka T (${fmtDur(c.walk)})</span></li>`);
+  else steps.push(busSteps(c.bus));
+  if (c.metro){ steps.push(`<li><span class="t"></span><span class="d">${wait(c.waitE)} på Eiksmarka</span></li>`); steps.push(rideStep(c.metro)); }
+  steps.push(`<li><span class="t"></span><span class="d">${wait(c.waitC)} på ${c.via === 'LYS' ? 'Lysaker' : c.via === 'NT' ? 'Nationaltheatret' : 'Oslo S'}</span></li>`);
+  steps.push(rideStep(c.fly, 'Oslo lufthavn'));
+  const sits = [...new Set([c.bus?.p.legs, [c.metro?.leg], [c.fly.leg]].flat().filter(Boolean).flatMap(l => (l.situations||[]).map(s => s.summary?.[0]?.value)).filter(Boolean))];
+  return `<article class="trip ${i === 0 ? 'best' : ''}">
+    <div class="top">
+      <div class="leave"><small>Gå hjemmefra</small><div class="times">${hm(c.leave)}<span class="arrow">→</span>${hm(c.arrive)}</div></div>
+      <div class="dur">${fmtDur(c.arrive - c.leave)}<small>${VIA[c.via]}</small></div>
+    </div>
+    <div class="route">${parts.join('<span class="sep">›</span>')}</div>
+    ${ntNote(c)}
+    ${sits.length ? `<div class="sit">⚠ ${esc(sits[0])}${sits.length > 1 ? ` (+${sits.length-1})` : ''}</div>` : ''}
+    <ul class="steps">${steps.join('')}</ul>
+  </article>`;
+}
+function render(){
+  $('filterWrap').hidden = !chains.length && !ctx;
+  const list = chains.filter(c => filter === 'all' || c.via === filter).slice(0, 15);
+  $('compare').innerHTML = compareHTML(); $('compare').hidden = !ctx?.app?.length;
+  $('list').innerHTML = list.length ? list.map(tripHTML).join('')
+    : `<div class="empty">Ingen reiser ${filter === 'all' ? '' : VIA[filter] + ' '}i dette tidsrommet.</div>`;
+}
+
+
+/* ---------- compare with what the app would suggest (plain search, no rules) ---------- */
+function appChip(l){
+  if (l.mode === 'metro') return chip(l.line?.publicCode || 'T', '--m-metro');
+  if (l.mode === 'rail') return chip(isFly(l) ? 'FLY' : (l.line?.publicCode || 'Tog'), isFly(l) ? '--m-fly' : '--m-rail');
+  if (l.mode === 'bus' || l.mode === 'coach') return chip(l.line?.publicCode || 'Buss', '--m-bus');
+  return chip(l.line?.publicCode || l.mode, '--m-walk');
+}
+function compareHTML(){
+  const app = ctx?.app || []; if (!app.length) return '';
+  const pick = ctx.arriveBy ? (a,b) => b.leave - a.leave : (a,b) => a.arrive - b.arrive;
+  const a0 = [...app].sort(pick)[0], m0 = chains[0];
+  let verdict = 'Fant ingen reise med dine bytter i dette tidsrommet.';
+  if (m0){
+    const dl = dmin(m0.leave - a0.leave), da = dmin(a0.arrive - m0.arrive);
+    const bits = [];
+    if (da > 0) bits.push(`kommer frem <b class="okm">${da} min tidligere</b>`); else if (da < 0) bits.push(`kommer frem <b class="tight">${-da} min senere</b>`);
+    if (dl > 0) bits.push(`lar deg gå <b class="okm">${dl} min senere</b> hjemmefra`); else if (dl < 0) bits.push(`krever at du går <b class="tight">${-dl} min tidligere</b>`);
+    verdict = bits.length ? `Beste reise med dine bytter (${VIA[m0.via]}) ${bits.join(' og ')} enn appens forslag.` : `Appens forslag og din beste reise er like gode.`;
+  }
+  const rows = app.sort(pick).slice(0, 3).map(a => {
+    const t = transitLegs(a.p);
+    const stops = t.map(l => l.fromPlace?.name || '').join(' ');
+    const flags = [];
+    if (/øster[åa]s/i.test(stops)) flags.push('bytter på Østerås');
+    if (!t.some(l => l.mode === 'rail' && isFly(l))) flags.push('uten Flytoget');
+    return `<div class="row"><div><div class="times">${hm(a.leave)}<span class="arrow">→</span>${hm(a.arrive)}</div>
+      <div class="route">${t.map(appChip).join('<span class="sep">›</span>')}</div>
+      ${flags.length ? `<div class="flag">${flags.join(' · ')}</div>` : ''}</div>
+      <div class="dur">${fmtDur(a.arrive - a.leave)}<small>${t.length - 1} bytter</small></div></div>`;
+  }).join('');
+  return `<h2>Mot appens forslag</h2><div class="verdict">${verdict}</div>${rows}`;
+}
+
+/* ---------- controls ---------- */
+let ctx_mode = 'dep';
+function seg(id, cb){
+  $(id).addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    [...$(id).children].forEach(x => x.setAttribute('aria-pressed', x === b)); cb(b.dataset.v);
+  });
+}
+seg('modeSeg', v => ctx_mode = v);
+seg('filterSeg', v => { filter = v; render(); });
+const setNow = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); $('when').value = d.toISOString().slice(0,16); };
+$('nowBtn').addEventListener('click', () => { setNow(); search(); });
+$('form').addEventListener('submit', e => { e.preventDefault(); search(); });
+$('home').addEventListener('change', () => { try{ localStorage.removeItem('tilosl.home'); }catch{} });
+loadSettings(); setNow();
+</script>
+</body>
+</html>
